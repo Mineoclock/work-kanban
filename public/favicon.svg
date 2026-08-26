@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">看板</title>
+  <rect width="512" height="512" fill="#222222"/>
+  <g transform="translate(40.96 40.96) scale(0.84)">
+    <rect width="512" height="512" rx="112" fill="#222222"/>
+    <path fill="#ffffff" d="M124 108h82v120l111-120h104L284 249l146 155H320L206 277v127h-82z"/>
+  </g>
+</svg>
