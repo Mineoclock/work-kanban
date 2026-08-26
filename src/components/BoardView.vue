@@ -14,6 +14,7 @@ const editingKey = ref('')
 const editingText = ref('')
 const isDragging = ref(false)
 const trashItems = ref<unknown[]>([])
+const submittingTodoLanes = new Set<string>()
 
 function startEdit(key: string, text: string) { editingKey.value = key; editingText.value = text; void nextTick(() => document.querySelector<HTMLInputElement>('.inline-editor')?.focus()) }
 function cancelEdit() { editingKey.value = ''; editingText.value = '' }
@@ -33,7 +34,19 @@ async function handleTrashAdd(event: { item: HTMLElement; newIndex?: number }) {
   const deleted = await store.deleteDragged(kind, id)
   if (!deleted) message.warning('只能删除空状态列')
 }
-async function addTodo(lane: Lane) { const text = newTodoText.value[lane.id] ?? ''; if (!text.trim()) return; await store.addTodo(lane, text); newTodoText.value[lane.id] = '' }
+async function addTodo(lane: Lane) {
+  if (submittingTodoLanes.has(lane.id)) return
+  const text = (newTodoText.value[lane.id] ?? '').trim()
+  if (!text) return
+
+  submittingTodoLanes.add(lane.id)
+  try {
+    await store.addTodo(lane, text)
+    newTodoText.value[lane.id] = ''
+  } finally {
+    submittingTodoLanes.delete(lane.id)
+  }
+}
 async function addLane() {
   await store.addLane()
   window.requestAnimationFrame(() => (document.activeElement as HTMLElement | null)?.blur())
@@ -59,7 +72,7 @@ async function addLane() {
           </div>
         </VueDraggable>
         <form class="todo-form" @submit.prevent="addTodo(lane)">
-          <NInput v-model:value="newTodoText[lane.id]" size="small" placeholder="添加 Todo" maxlength="200" @keydown.enter.prevent="addTodo(lane)"><template #prefix><Plus :size="15" /></template></NInput>
+          <NInput v-model:value="newTodoText[lane.id]" size="small" placeholder="添加 Todo" maxlength="200" @blur="addTodo(lane)" @keydown.enter.prevent="addTodo(lane)"><template #prefix><Plus :size="15" /></template></NInput>
         </form>
       </section>
     </VueDraggable>
