@@ -97,7 +97,7 @@ async function addLane() {
 .icon-button { display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; color: var(--muted-text); padding: 3px; border-radius: 5px; }
 .lane-grip { cursor: grab !important; }
 .lane-grip:active { cursor: grabbing !important; }
-.todo-list { min-height: 0; display: flex; flex-direction: column; gap: 8px; margin: 12px 0 8px; }
+.todo-list { min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 12px 0 8px; }
 .todo-list--empty { margin-bottom: 0; }
 .todo-row { display: flex; align-items: flex-start; gap: 8px; min-height: 48px; box-sizing: border-box; padding: 12px; border: 1px solid var(--border); border-radius: 5px; background: var(--todo-bg); color: var(--todo-text); box-shadow: 0 1px 2px rgba(0, 0, 0, .025); font-size: 15px; line-height: 1.45; }
 .todo-text { flex: 1; cursor: default; word-break: break-word; color: var(--todo-text); }
