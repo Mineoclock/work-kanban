@@ -1,5 +1,7 @@
 # Local Kanban
 
+在线地址：https://mineoclock.github.io/work-kanban  
+
 一个将看板数据直接保存到本地 JSON 文件的轻量看板工具。  
 可创建多个状态列，todo卡片在列间移动。
 
