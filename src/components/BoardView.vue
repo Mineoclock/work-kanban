@@ -65,7 +65,7 @@ async function addLane() {
             <span class="count-badge">{{ lane.todos.length }}</span>
           </div>
         </header>
-        <VueDraggable v-model="lane.todos" class="todo-list" :class="{ 'todo-list--empty': lane.todos.length === 0 }" :group="{ name: 'todos', pull: true, put: true }" item-key="id" :animation="180" ghost-class="todo-ghost" @start="onDragStart" @end="onDragEnd">
+        <VueDraggable v-model="lane.todos" class="todo-list" :class="{ 'todo-list--empty': lane.todos.length === 0 }" :group="{ name: 'todos', pull: true, put: true }" item-key="id" :animation="180" filter=".inline-editor" :prevent-on-filter="false" ghost-class="todo-ghost" @start="onDragStart" @end="onDragEnd">
           <div v-for="todo in lane.todos" :key="todo.id" class="todo-row" data-drag-kind="todo" :data-drag-id="todo.id">
             <input v-if="editingKey === `todo-${todo.id}`" v-model="editingText" class="inline-editor todo-editor" @blur="finishEdit((value) => store.renameTodo(todo, value))" @keydown.enter.prevent="finishEdit((value) => store.renameTodo(todo, value))" @keydown.esc.prevent="cancelEdit" />
             <span v-else class="todo-text" @dblclick="startEdit(`todo-${todo.id}`, todo.text)">{{ todo.text }}</span>
