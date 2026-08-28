@@ -87,7 +87,7 @@ async function addLane() {
 .board-wrap { position: relative; display: flex; align-items: stretch; gap: 8px; flex: 1; height: 100vh; min-height: 0; box-sizing: border-box; overflow: auto; padding: 16px; scrollbar-width: none; }
 .board-wrap::-webkit-scrollbar { display: none; }
 .lane-list { display: flex; align-items: stretch; gap: 8px; min-height: 100%; }
-.lane-panel { flex: 0 0 300px; width: 300px; box-sizing: border-box; min-height: calc(100vh - 32px); padding: 0 4px; }
+.lane-panel { flex: 0 0 296px; width: 296px; box-sizing: border-box; min-height: calc(100vh - 32px); padding: 0 3px; }
 .lane-header, .lane-title-wrap { display: flex; align-items: center; }
 .lane-header { justify-content: space-between; gap: 8px; }
 .lane-title-wrap { min-width: 0; gap: 7px; }
