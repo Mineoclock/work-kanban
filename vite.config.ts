@@ -2,6 +2,8 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
 
+const base = '/work-kanban/'
+
 export default defineConfig({
   plugins: [
     vue(),
@@ -17,10 +19,11 @@ export default defineConfig({
         display: 'standalone',
         lang: 'zh-CN',
         icons: [
-          { src: '/pwa-icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }
+          { src: 'pwa-icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }
         ]
       },
-      workbox: { navigateFallback: '/index.html' }
+      workbox: { navigateFallback: `${base}index.html` }
     })
-  ]
+  ],
+  base
 })

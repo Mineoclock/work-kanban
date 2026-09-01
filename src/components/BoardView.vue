@@ -19,6 +19,11 @@ const submittingTodoLanes = new Set<string>()
 function startEdit(key: string, text: string) { editingKey.value = key; editingText.value = text; void nextTick(() => document.querySelector<HTMLInputElement>('.inline-editor')?.focus()) }
 function cancelEdit() { editingKey.value = ''; editingText.value = '' }
 async function finishEdit(save: (value: string) => Promise<void>) { const value = editingText.value.trim(); cancelEdit(); if (value) await save(value) }
+function handleEnter(event: KeyboardEvent, action: () => void | Promise<void>) {
+  if (event.isComposing || event.keyCode === 229) return
+  event.preventDefault()
+  void action()
+}
 function onDragStart() { isDragging.value = true }
 function onDragEnd() { void store.persist(); window.setTimeout(() => { isDragging.value = false }, 0) }
 function canTrashMove(event: { draggedContext?: { element?: unknown } }) { return Boolean(event.draggedContext?.element) }
@@ -60,19 +65,19 @@ async function addLane() {
         <header class="lane-header">
           <div class="lane-title-wrap">
             <button class="icon-button lane-grip" title="拖动状态列" aria-label="拖动状态列"><GripVertical :size="16" /></button>
-            <input v-if="editingKey === `lane-${lane.id}`" v-model="editingText" class="inline-editor lane-editor" @blur="finishEdit((value) => store.renameLane(lane, value))" @keydown.enter.prevent="finishEdit((value) => store.renameLane(lane, value))" @keydown.esc.prevent="cancelEdit" />
+            <input v-if="editingKey === `lane-${lane.id}`" v-model="editingText" class="inline-editor lane-editor" @blur="finishEdit((value) => store.renameLane(lane, value))" @keydown.enter="handleEnter($event, () => finishEdit((value) => store.renameLane(lane, value)))" @keydown.esc.prevent="cancelEdit" />
             <h2 v-else @dblclick="startEdit(`lane-${lane.id}`, lane.name)">{{ lane.name }}</h2>
             <span class="count-badge">{{ lane.todos.length }}</span>
           </div>
         </header>
         <VueDraggable v-model="lane.todos" class="todo-list" :class="{ 'todo-list--empty': lane.todos.length === 0 }" :group="{ name: 'todos', pull: true, put: true }" item-key="id" :animation="180" filter=".inline-editor" :prevent-on-filter="false" ghost-class="todo-ghost" @start="onDragStart" @end="onDragEnd">
           <div v-for="todo in lane.todos" :key="todo.id" class="todo-row" data-drag-kind="todo" :data-drag-id="todo.id">
-            <input v-if="editingKey === `todo-${todo.id}`" v-model="editingText" class="inline-editor todo-editor" @blur="finishEdit((value) => store.renameTodo(todo, value))" @keydown.enter.prevent="finishEdit((value) => store.renameTodo(todo, value))" @keydown.esc.prevent="cancelEdit" />
+            <input v-if="editingKey === `todo-${todo.id}`" v-model="editingText" class="inline-editor todo-editor" @blur="finishEdit((value) => store.renameTodo(todo, value))" @keydown.enter="handleEnter($event, () => finishEdit((value) => store.renameTodo(todo, value)))" @keydown.esc.prevent="cancelEdit" />
             <span v-else class="todo-text" @dblclick="startEdit(`todo-${todo.id}`, todo.text)">{{ todo.text }}</span>
           </div>
         </VueDraggable>
         <form class="todo-form" @submit.prevent="addTodo(lane)">
-          <NInput v-model:value="newTodoText[lane.id]" size="small" placeholder="添加 Todo" maxlength="200" @blur="addTodo(lane)" @keydown.enter.prevent="addTodo(lane)"><template #prefix><Plus :size="15" /></template></NInput>
+          <NInput v-model:value="newTodoText[lane.id]" size="small" placeholder="添加 Todo" maxlength="200" @blur="addTodo(lane)" @keydown.enter="handleEnter($event, () => addTodo(lane))"><template #prefix><Plus :size="15" /></template></NInput>
         </form>
       </section>
     </VueDraggable>
@@ -87,7 +92,7 @@ async function addLane() {
 .board-wrap { position: relative; display: flex; align-items: stretch; gap: 8px; flex: 1; height: 100vh; min-height: 0; box-sizing: border-box; overflow: auto; padding: 16px; scrollbar-width: none; }
 .board-wrap::-webkit-scrollbar { display: none; }
 .lane-list { display: flex; align-items: stretch; gap: 8px; min-height: 100%; }
-.lane-panel { flex: 0 0 296px; width: 296px; box-sizing: border-box; min-height: calc(100vh - 32px); padding: 0 3px; }
+.lane-panel { flex: 0 0 280px; width: 280px; box-sizing: border-box; min-height: calc(100vh - 32px); padding: 0 3px; }
 .lane-header, .lane-title-wrap { display: flex; align-items: center; }
 .lane-header { justify-content: space-between; gap: 8px; }
 .lane-title-wrap { min-width: 0; gap: 7px; }
