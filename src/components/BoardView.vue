@@ -163,18 +163,18 @@ function requestDelete() {
 .lane-header, .lane-title-wrap { display: flex; align-items: center; }
 .lane-header { justify-content: space-between; gap: 8px; }
 .lane-title-wrap { min-width: 0; gap: 7px; }
-.lane-header { min-height: 32px; }
+.lane-header { min-height: 32px; flex-shrink: 0; }
 .lane-header h2 { margin: 0; cursor: default; font-size: 15px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .count-badge { min-width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; padding: 0 6px; border-radius: 10px; background: var(--muted-bg); color: var(--muted-text); font-size: 11px; }
 .icon-button { display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; color: var(--muted-text); padding: 3px; border-radius: 5px; }
 .lane-grip { cursor: grab !important; }
 .lane-grip:active { cursor: grabbing !important; }
-.todo-list { min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 12px 0 8px; }
+.todo-list { min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 12px 0 8px; flex-shrink: 0; }
 .todo-list--empty { margin-bottom: 0; padding: 12px 0 0; }
 .todo-row { display: flex; align-items: flex-start; gap: 8px; min-height: 48px; box-sizing: border-box; padding: 12px; border: 1px solid var(--border); border-radius: 5px; background: var(--todo-bg); color: var(--todo-text); box-shadow: 0 1px 2px rgba(0, 0, 0, .025); font-size: 15px; line-height: 1.45; }
 .todo-text { flex: 1; cursor: default; word-break: break-word; color: var(--todo-text); }
 .lane-ghost, .todo-ghost { opacity: .7; background: transparent; border: 1px dashed var(--border); box-shadow: none; }
-.todo-form { margin: 0 0 20px; }
+.todo-form { margin: 0 0 20px; flex-shrink: 0; }
 .todo-form :deep(.n-input) { width: 100%; height: 48px; box-sizing: border-box; background: var(--todo-bg); border: 1px solid var(--border); border-radius: 5px; }
 .todo-form :deep(.n-input__border), .todo-form :deep(.n-input__state-border) { display: none; }
 .todo-form :deep(.n-input__content) { height: 100%; padding: 0 12px; }
