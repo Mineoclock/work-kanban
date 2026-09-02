@@ -153,7 +153,7 @@ export const useKanbanStore = defineStore('kanban', {
     async deleteLane(laneId: string): Promise<boolean> {
       const project = this.currentProject
       const lane = project?.lanes.find((item) => item.id === laneId)
-      if (!project || !lane || lane.todos.length > 0) return false
+      if (!project || !lane) return false
       project.lanes = project.lanes.filter((item) => item.id !== laneId)
       await this.persist()
       return true
@@ -168,25 +168,17 @@ export const useKanbanStore = defineStore('kanban', {
       todo.text = text.trim()
       await this.persist()
     },
-    async deleteDragged(kind: 'lane' | 'todo', id: string): Promise<boolean> {
+    async deleteTodo(todoId: string): Promise<boolean> {
       const project = this.currentProject
       if (!project) return false
-      if (kind === 'lane') {
-        const lane = project.lanes.find((item) => item.id === id)
-        if (!lane || lane.todos.length > 0) return false
-        project.lanes = project.lanes.filter((item) => item.id !== id)
-      } else {
-        for (const lane of project.lanes) {
-          if (kind === 'todo' && lane.todos.some((todo) => todo.id === id)) {
-            lane.todos = lane.todos.filter((todo) => todo.id !== id)
-            await this.persist()
-            return true
-          }
+      for (const lane of project.lanes) {
+        if (lane.todos.some((todo) => todo.id === todoId)) {
+          lane.todos = lane.todos.filter((todo) => todo.id !== todoId)
+          await this.persist()
+          return true
         }
-        return false
       }
-      await this.persist()
-      return true
+      return false
     }
   }
 })

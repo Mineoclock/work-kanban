@@ -1,19 +1,17 @@
 <script setup lang="ts">
-import { nextTick, ref } from 'vue'
+import { nextTick, onBeforeUnmount, ref } from 'vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import { GripVertical, Plus, Trash2 } from 'lucide-vue-next'
-import { NButton, NInput, useMessage } from 'naive-ui'
+import { NButton, NInput, useDialog } from 'naive-ui'
 import { useKanbanStore } from '../stores/kanban'
 import type { Lane, Project, TodoItem } from '../types'
 
 defineProps<{ project: Project }>()
 const store = useKanbanStore()
-const message = useMessage()
+const dialog = useDialog()
 const newTodoText = ref<Record<string, string>>({})
 const editingKey = ref('')
 const editingText = ref('')
-const isDragging = ref(false)
-const trashItems = ref<unknown[]>([])
 const submittingTodoLanes = new Set<string>()
 
 function startEdit(key: string, text: string) { editingKey.value = key; editingText.value = text; void nextTick(() => document.querySelector<HTMLInputElement>('.inline-editor')?.focus()) }
@@ -24,20 +22,10 @@ function handleEnter(event: KeyboardEvent, action: () => void | Promise<void>) {
   event.preventDefault()
   void action()
 }
-function onDragStart() { isDragging.value = true }
-function onDragEnd() { void store.persist(); window.setTimeout(() => { isDragging.value = false }, 0) }
-function canTrashMove(event: { draggedContext?: { element?: unknown } }) { return Boolean(event.draggedContext?.element) }
+function onDragEnd() { void store.persist() }
 function blurButton(event: MouseEvent) {
   const target = event.currentTarget
   if (target instanceof HTMLElement) target.blur()
-}
-async function handleTrashAdd(event: { item: HTMLElement; newIndex?: number }) {
-  const kind = event.item.dataset.dragKind as 'lane' | 'todo' | undefined
-  const id = event.item.dataset.dragId
-  if (event.newIndex !== undefined) trashItems.value.splice(event.newIndex, 1)
-  if (!kind || !id) return
-  const deleted = await store.deleteDragged(kind, id)
-  if (!deleted) message.warning('只能删除空状态列')
 }
 async function addTodo(lane: Lane) {
   if (submittingTodoLanes.has(lane.id)) return
@@ -56,13 +44,85 @@ async function addLane() {
   await store.addLane()
   window.requestAnimationFrame(() => (document.activeElement as HTMLElement | null)?.blur())
 }
+
+interface ContextMenuState {
+  x: number
+  y: number
+  kind: 'lane' | 'todo'
+  lane: Lane
+  todo?: TodoItem
+}
+const ctxMenu = ref<ContextMenuState | null>(null)
+const ctxMenuEl = ref<HTMLElement | null>(null)
+
+function openContextMenu(event: MouseEvent, kind: 'lane' | 'todo', lane: Lane, todo?: TodoItem) {
+  event.preventDefault()
+  if (kind === 'todo' && todo && editingKey.value === `todo-${todo.id}`) return
+  if (kind === 'lane' && editingKey.value === `lane-${lane.id}`) return
+  const x = Math.min(Math.max(event.clientX, 8), window.innerWidth - 176)
+  const y = Math.min(Math.max(event.clientY, 8), window.innerHeight - 52)
+  ctxMenu.value = { x, y, kind, lane, todo }
+  window.addEventListener('click', onWindowMenuClick, true)
+  window.addEventListener('contextmenu', onWindowMenuContext, true)
+  window.addEventListener('wheel', closeContextMenu, { capture: true, passive: true })
+  window.addEventListener('keydown', onWindowMenuKey, true)
+}
+function isInsideMenu(target: EventTarget | null): boolean {
+  return Boolean(ctxMenuEl.value && target instanceof Node && ctxMenuEl.value.contains(target))
+}
+function onWindowMenuClick(event: MouseEvent) { if (!isInsideMenu(event.target)) closeContextMenu() }
+function onWindowMenuContext(event: MouseEvent) { if (!isInsideMenu(event.target)) closeContextMenu() }
+function onWindowMenuKey(event: KeyboardEvent) { if (event.key === 'Escape') closeContextMenu() }
+function closeContextMenu() {
+  if (!ctxMenu.value) return
+  ctxMenu.value = null
+  window.removeEventListener('click', onWindowMenuClick, true)
+  window.removeEventListener('contextmenu', onWindowMenuContext, true)
+  window.removeEventListener('wheel', closeContextMenu, { capture: true } as EventListenerOptions)
+  window.removeEventListener('keydown', onWindowMenuKey, true)
+}
+onBeforeUnmount(closeContextMenu)
+
+function truncateLabel(text: string): string {
+  return text.length > 20 ? `${text.slice(0, 20)}…` : text
+}
+function requestDelete() {
+  const target = ctxMenu.value
+  closeContextMenu()
+  if (!target) return
+  if (target.kind === 'lane') {
+    if (target.lane.todos.length === 0) {
+      void store.deleteLane(target.lane.id)
+      return
+    }
+    const lane = target.lane
+    dialog.error({
+      title: '删除状态列',
+      content: `确定删除状态列「${truncateLabel(lane.name)}」及其 ${lane.todos.length} 条 Todo 吗？此操作无法撤销。`,
+      positiveText: '删除',
+      negativeText: '取消',
+      showIcon: false,
+      onPositiveClick: () => store.deleteLane(lane.id)
+    })
+    return
+  }
+  const todo = target.todo!
+  dialog.error({
+    title: '删除 Todo',
+    content: `确定删除「${truncateLabel(todo.text)}」吗？此操作无法撤销。`,
+    positiveText: '删除',
+    negativeText: '取消',
+    showIcon: false,
+    onPositiveClick: () => store.deleteTodo(todo.id)
+  })
+}
 </script>
 
 <template>
   <main class="board-wrap">
-    <VueDraggable v-model="project.lanes" class="lane-list" group="lanes" item-key="id" handle=".lane-grip" ghost-class="lane-ghost" :animation="180" @start="onDragStart" @end="onDragEnd">
-      <section v-for="lane in project.lanes" :key="lane.id" class="lane-panel" data-drag-kind="lane" :data-drag-id="lane.id">
-        <header class="lane-header">
+    <VueDraggable v-model="project.lanes" class="lane-list" group="lanes" item-key="id" handle=".lane-grip" ghost-class="lane-ghost" :animation="180" @end="onDragEnd">
+      <section v-for="lane in project.lanes" :key="lane.id" class="lane-panel">
+        <header class="lane-header" @contextmenu="openContextMenu($event, 'lane', lane)">
           <div class="lane-title-wrap">
             <button class="icon-button lane-grip" title="拖动状态列" aria-label="拖动状态列"><GripVertical :size="16" /></button>
             <input v-if="editingKey === `lane-${lane.id}`" v-model="editingText" class="inline-editor lane-editor" @blur="finishEdit((value) => store.renameLane(lane, value))" @keydown.enter="handleEnter($event, () => finishEdit((value) => store.renameLane(lane, value)))" @keydown.esc.prevent="cancelEdit" />
@@ -70,8 +130,8 @@ async function addLane() {
             <span class="count-badge">{{ lane.todos.length }}</span>
           </div>
         </header>
-        <VueDraggable v-model="lane.todos" class="todo-list" :class="{ 'todo-list--empty': lane.todos.length === 0 }" :group="{ name: 'todos', pull: true, put: true }" item-key="id" :animation="180" filter=".inline-editor" :prevent-on-filter="false" ghost-class="todo-ghost" @start="onDragStart" @end="onDragEnd">
-          <div v-for="todo in lane.todos" :key="todo.id" class="todo-row" data-drag-kind="todo" :data-drag-id="todo.id">
+        <VueDraggable v-model="lane.todos" class="todo-list" :class="{ 'todo-list--empty': lane.todos.length === 0 }" :group="{ name: 'todos', pull: true, put: true }" item-key="id" :animation="180" filter=".inline-editor" :prevent-on-filter="false" ghost-class="todo-ghost" @end="onDragEnd">
+          <div v-for="todo in lane.todos" :key="todo.id" class="todo-row" @contextmenu="openContextMenu($event, 'todo', lane, todo)">
             <input v-if="editingKey === `todo-${todo.id}`" v-model="editingText" class="inline-editor todo-editor" @blur="finishEdit((value) => store.renameTodo(todo, value))" @keydown.enter="handleEnter($event, () => finishEdit((value) => store.renameTodo(todo, value)))" @keydown.esc.prevent="cancelEdit" />
             <span v-else class="todo-text" @dblclick="startEdit(`todo-${todo.id}`, todo.text)">{{ todo.text }}</span>
           </div>
@@ -84,7 +144,14 @@ async function addLane() {
     <div class="page-actions" aria-label="看板操作">
       <NButton quaternary @mousedown="blurButton" @click="addLane"><template #icon><Plus :size="16" /></template>新状态列</NButton>
     </div>
-    <VueDraggable v-model="trashItems" class="trash-drop" :class="{ 'trash-drop--visible': isDragging }" item-key="id" :group="{ name: 'trash', pull: false, put: true }" :sort="false" :move="canTrashMove" aria-hidden="true" @add="handleTrashAdd"><Trash2 :size="19" /><span>拖到这里删除</span></VueDraggable>
+    <Teleport to="body">
+      <div v-if="ctxMenu" ref="ctxMenuEl" class="ctx-menu" :style="{ left: `${ctxMenu.x}px`, top: `${ctxMenu.y}px` }" @click.stop @contextmenu.prevent.stop>
+        <button class="ctx-item ctx-item--danger" @click="requestDelete">
+          <Trash2 :size="15" />
+          <span>{{ ctxMenu.kind === 'lane' ? '删除状态列' : '删除 Todo' }}</span>
+        </button>
+      </div>
+    </Teleport>
   </main>
 </template>
 
@@ -92,7 +159,7 @@ async function addLane() {
 .board-wrap { position: relative; display: flex; align-items: stretch; gap: 8px; flex: 1; height: 100vh; min-height: 0; box-sizing: border-box; overflow: auto; padding: 16px; scrollbar-width: none; }
 .board-wrap::-webkit-scrollbar { display: none; }
 .lane-list { display: flex; align-items: stretch; gap: 8px; min-height: 100%; }
-.lane-panel { flex: 0 0 280px; width: 280px; box-sizing: border-box; min-height: calc(100vh - 32px); padding: 0 3px; }
+.lane-panel { flex: 0 0 280px; width: 280px; box-sizing: border-box; min-height: calc(100vh - 32px); padding: 0 3px; display: flex; flex-direction: column; }
 .lane-header, .lane-title-wrap { display: flex; align-items: center; }
 .lane-header { justify-content: space-between; gap: 8px; }
 .lane-title-wrap { min-width: 0; gap: 7px; }
@@ -103,7 +170,7 @@ async function addLane() {
 .lane-grip { cursor: grab !important; }
 .lane-grip:active { cursor: grabbing !important; }
 .todo-list { min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 12px 0 8px; }
-.todo-list--empty { margin-bottom: 0; }
+.todo-list--empty { margin-bottom: 0; padding: 12px 0 0; }
 .todo-row { display: flex; align-items: flex-start; gap: 8px; min-height: 48px; box-sizing: border-box; padding: 12px; border: 1px solid var(--border); border-radius: 5px; background: var(--todo-bg); color: var(--todo-text); box-shadow: 0 1px 2px rgba(0, 0, 0, .025); font-size: 15px; line-height: 1.45; }
 .todo-text { flex: 1; cursor: default; word-break: break-word; color: var(--todo-text); }
 .lane-ghost, .todo-ghost { opacity: .7; background: transparent; border: 1px dashed var(--border); box-shadow: none; }
@@ -120,10 +187,7 @@ async function addLane() {
 .todo-editor { flex: 1; font-size: 15px; }
 .page-actions { align-self: flex-start; flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
 .page-actions :deep(.n-button) { height: 32px; }
-.trash-drop { position: fixed; right: 28px; bottom: 24px; z-index: 5; display: block; width: 220px; height: 88px; box-sizing: border-box; flex: 0 0 220px; min-width: 0; min-height: 0; overflow: hidden; white-space: nowrap; padding: 11px 14px; border: 1px dashed var(--trash-border); border-radius: 8px; background: var(--trash-bg); color: var(--trash-text); font-size: 12px; opacity: 0; pointer-events: none; transform: translateY(6px); }
-.trash-drop > svg, .trash-drop > span { position: absolute; top: 50%; transform: translateY(-50%); }
-.trash-drop > svg { left: calc(50% - 56px); }
-.trash-drop > span { left: calc(50% - 28px); }
-.trash-drop > [data-drag-kind] { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
-.trash-drop--visible { opacity: 1; pointer-events: auto; transform: translateY(0); }
+.ctx-menu { position: fixed; z-index: 3000; min-width: 156px; box-sizing: border-box; padding: 4px; border: 1px solid var(--border); border-radius: 8px; background: var(--box-bg); box-shadow: 0 8px 24px rgba(0, 0, 0, .14); }
+.ctx-item { display: flex; align-items: center; gap: 8px; width: 100%; box-sizing: border-box; padding: 8px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--text); font: inherit; font-size: 14px; line-height: 1.2; text-align: left; }
+.ctx-item--danger:hover { background: var(--trash-bg); color: var(--trash-text); }
 </style>
