@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, ref } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import { GripVertical, Plus, Trash2 } from 'lucide-vue-next'
 import { NButton, NInput, useDialog } from 'naive-ui'
@@ -83,6 +83,122 @@ function closeContextMenu() {
 }
 onBeforeUnmount(closeContextMenu)
 
+const boardWrapEl = ref<HTMLElement | null>(null)
+const scrollbarEl = ref<HTMLElement | null>(null)
+const scrollbarVisible = ref(false)
+const scrollbarThumbWidth = ref(0)
+const scrollbarThumbOffset = ref(0)
+const scrollbarPercent = ref(0)
+let scrollbarResizeObserver: ResizeObserver | null = null
+let scrollbarMutationObserver: MutationObserver | null = null
+let scrollbarMeasureFrame = 0
+let scrollbarDragCleanup: (() => void) | null = null
+
+function updateScrollbar() {
+  const board = boardWrapEl.value
+  const scrollbar = scrollbarEl.value
+  if (!board || !scrollbar) return
+
+  const maxScroll = Math.max(board.scrollWidth - board.clientWidth, 0)
+  const trackWidth = scrollbar.clientWidth
+  if (maxScroll === 0 || trackWidth === 0) {
+    scrollbarVisible.value = false
+    scrollbarThumbWidth.value = 0
+    scrollbarThumbOffset.value = 0
+    scrollbarPercent.value = 0
+    return
+  }
+
+  scrollbarVisible.value = true
+  const thumbWidth = Math.min(trackWidth, Math.max(32, trackWidth * board.clientWidth / board.scrollWidth))
+  const maxOffset = trackWidth - thumbWidth
+  scrollbarThumbWidth.value = thumbWidth
+  scrollbarThumbOffset.value = maxOffset * board.scrollLeft / maxScroll
+  scrollbarPercent.value = Math.round(board.scrollLeft / maxScroll * 100)
+}
+function scheduleScrollbarUpdate() {
+  if (scrollbarMeasureFrame) return
+  scrollbarMeasureFrame = window.requestAnimationFrame(() => {
+    scrollbarMeasureFrame = 0
+    updateScrollbar()
+  })
+}
+function setBoardScrollFromThumb(offset: number) {
+  const board = boardWrapEl.value
+  const scrollbar = scrollbarEl.value
+  if (!board || !scrollbar) return
+  const maxOffset = Math.max(scrollbar.clientWidth - scrollbarThumbWidth.value, 0)
+  const maxScroll = Math.max(board.scrollWidth - board.clientWidth, 0)
+  const clampedOffset = Math.min(Math.max(offset, 0), maxOffset)
+  board.scrollLeft = maxOffset === 0 ? 0 : clampedOffset / maxOffset * maxScroll
+  updateScrollbar()
+}
+function onBoardScroll() { updateScrollbar() }
+function onScrollbarPointerDown(event: PointerEvent) {
+  if (event.target !== event.currentTarget) return
+  const scrollbar = scrollbarEl.value
+  if (!scrollbar) return
+  const rect = scrollbar.getBoundingClientRect()
+  setBoardScrollFromThumb(event.clientX - rect.left - scrollbarThumbWidth.value / 2)
+}
+function startScrollbarDrag(event: PointerEvent) {
+  event.preventDefault()
+  const startX = event.clientX
+  const startOffset = scrollbarThumbOffset.value
+  const onMove = (moveEvent: PointerEvent) => setBoardScrollFromThumb(startOffset + moveEvent.clientX - startX)
+  const finish = () => {
+    window.removeEventListener('pointermove', onMove)
+    window.removeEventListener('pointerup', finish)
+    window.removeEventListener('pointercancel', finish)
+    scrollbarDragCleanup = null
+  }
+  scrollbarDragCleanup = finish
+  window.addEventListener('pointermove', onMove)
+  window.addEventListener('pointerup', finish)
+  window.addEventListener('pointercancel', finish)
+}
+function onScrollbarKeydown(event: KeyboardEvent) {
+  const board = boardWrapEl.value
+  if (!board) return
+  const step = Math.max(board.clientWidth * 0.9, 1)
+  let nextScroll: number | null = null
+  if (event.key === 'ArrowLeft') nextScroll = board.scrollLeft - step
+  if (event.key === 'ArrowRight') nextScroll = board.scrollLeft + step
+  if (event.key === 'PageUp') nextScroll = board.scrollLeft - board.clientWidth
+  if (event.key === 'PageDown') nextScroll = board.scrollLeft + board.clientWidth
+  if (event.key === 'Home') nextScroll = 0
+  if (event.key === 'End') nextScroll = board.scrollWidth
+  if (nextScroll === null) return
+  event.preventDefault()
+  board.scrollLeft = nextScroll
+  updateScrollbar()
+}
+function cleanupScrollbar() {
+  boardWrapEl.value?.removeEventListener('scroll', onBoardScroll)
+  window.removeEventListener('resize', scheduleScrollbarUpdate)
+  scrollbarResizeObserver?.disconnect()
+  scrollbarMutationObserver?.disconnect()
+  scrollbarResizeObserver = null
+  scrollbarMutationObserver = null
+  if (scrollbarMeasureFrame) window.cancelAnimationFrame(scrollbarMeasureFrame)
+  scrollbarMeasureFrame = 0
+  scrollbarDragCleanup?.()
+}
+onMounted(() => {
+  const board = boardWrapEl.value
+  if (!board) return
+  board.addEventListener('scroll', onBoardScroll, { passive: true })
+  window.addEventListener('resize', scheduleScrollbarUpdate)
+  scrollbarResizeObserver = new ResizeObserver(scheduleScrollbarUpdate)
+  scrollbarResizeObserver.observe(board)
+  const laneList = board.querySelector<HTMLElement>('.lane-list')
+  if (laneList) scrollbarResizeObserver.observe(laneList)
+  scrollbarMutationObserver = new MutationObserver(scheduleScrollbarUpdate)
+  scrollbarMutationObserver.observe(board, { childList: true, subtree: true })
+  scheduleScrollbarUpdate()
+})
+onBeforeUnmount(cleanupScrollbar)
+
 function truncateLabel(text: string): string {
   return text.length > 20 ? `${text.slice(0, 20)}…` : text
 }
@@ -117,7 +233,8 @@ function requestDelete() {
 </script>
 
 <template>
-  <main class="board-wrap">
+  <div class="board-shell">
+    <main id="kanban-board-scroll" ref="boardWrapEl" class="board-wrap">
     <VueDraggable v-model="project.lanes" class="lane-list" group="lanes" item-key="id" handle=".lane-grip" ghost-class="lane-ghost" :animation="180" @end="onDragEnd">
       <section v-for="lane in project.lanes" :key="lane.id" class="lane-panel">
         <header class="lane-header" @contextmenu="openContextMenu($event, 'lane', lane)">
@@ -150,17 +267,43 @@ function requestDelete() {
         </button>
       </div>
     </Teleport>
-  </main>
+    </main>
+    <div
+      ref="scrollbarEl"
+      class="floating-scrollbar"
+      :class="{ 'floating-scrollbar--hidden': !scrollbarVisible }"
+      role="scrollbar"
+      tabindex="0"
+      aria-label="横向滚动"
+      aria-controls="kanban-board-scroll"
+      aria-valuemin="0"
+      aria-valuemax="100"
+      :aria-valuenow="scrollbarPercent"
+      @pointerdown="onScrollbarPointerDown"
+      @keydown="onScrollbarKeydown"
+    >
+      <div
+        class="floating-scrollbar-thumb"
+        :style="{ width: `${scrollbarThumbWidth}px`, transform: `translateX(${scrollbarThumbOffset}px)` }"
+        aria-hidden="true"
+        @pointerdown.stop="startScrollbarDrag"
+      />
+    </div>
+  </div>
 </template>
 
 <style scoped>
-.board-wrap { position: relative; display: flex; align-items: stretch; gap: 8px; flex: 1; min-height: 0; box-sizing: border-box; overflow-x: auto; overflow-y: hidden; padding: 16px 16px 0; scrollbar-color: var(--border) transparent; }
-.board-wrap::-webkit-scrollbar { height: 8px; background: transparent; }
-.board-wrap::-webkit-scrollbar-track { background: transparent; }
-.board-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-.board-wrap::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+.board-shell { position: relative; display: flex; flex: 1; min-height: 0; overflow: hidden; }
+.board-wrap { position: relative; display: flex; align-items: stretch; gap: 8px; flex: 1; min-height: 0; box-sizing: border-box; overflow-x: auto; overflow-y: hidden; padding: 16px 16px 0; scrollbar-width: none; }
+.board-wrap::-webkit-scrollbar { display: none; }
+.floating-scrollbar { position: absolute; z-index: 10; right: 16px; bottom: 2px; left: 16px; height: 10px; border-radius: 5px; background: transparent; cursor: pointer; touch-action: none; }
+.floating-scrollbar--hidden { visibility: hidden; pointer-events: none; }
+.floating-scrollbar:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.floating-scrollbar-thumb { position: absolute; top: 1px; left: 0; height: 8px; border-radius: 4px; background: var(--border); cursor: grab; transition: background-color .15s ease; }
+.floating-scrollbar-thumb:hover { background: var(--accent); }
+.floating-scrollbar-thumb:active { cursor: grabbing; }
 .lane-list { display: flex; align-items: stretch; gap: 8px; height: 100%; }
-.lane-panel { flex: 0 0 280px; width: 280px; height: 100%; box-sizing: border-box; padding: 0 3px; display: flex; flex-direction: column; min-height: 0; overflow-y: auto; scrollbar-width: none; }
+.lane-panel { flex: 0 0 280px; width: 280px; height: 100%; box-sizing: border-box; padding: 0 3px 16px; display: flex; flex-direction: column; min-height: 0; overflow-y: auto; scrollbar-width: none; }
 .lane-panel::-webkit-scrollbar { display: none; }
 .lane-header, .lane-title-wrap { display: flex; align-items: center; }
 .lane-header { justify-content: space-between; gap: 8px; }
