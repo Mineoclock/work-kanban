@@ -300,7 +300,6 @@ function requestDelete() {
 .floating-scrollbar--hidden { visibility: hidden; pointer-events: none; }
 .floating-scrollbar:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .floating-scrollbar-thumb { position: absolute; top: 1px; left: 0; height: 8px; border-radius: 4px; background: var(--border); cursor: grab; transition: background-color .15s ease; }
-.floating-scrollbar-thumb:hover { background: var(--accent); }
 .floating-scrollbar-thumb:active { cursor: grabbing; }
 .lane-list { display: flex; align-items: stretch; gap: 8px; height: 100%; }
 .lane-panel { flex: 0 0 280px; width: 280px; height: 100%; box-sizing: border-box; padding: 0 3px 16px; display: flex; flex-direction: column; min-height: 0; overflow-y: auto; scrollbar-width: none; }
