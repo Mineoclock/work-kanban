@@ -36,11 +36,10 @@ const emit = defineEmits<{ restore: []; open: []; create: [] }>()
 </template>
 
 <style scoped>
-.file-setup { min-height: 100vh; display: grid; place-items: center; padding: 24px; box-sizing: border-box; }
+.file-setup { flex: 1; min-height: 0; display: grid; place-items: center; padding: 24px; box-sizing: border-box; }
 .file-card { width: min(420px, 100%); padding: 28px; box-sizing: border-box; border: 1px solid var(--border); border-radius: 10px; background: var(--box-bg); box-shadow: var(--shadow); }
 .file-title { margin: 0 0 10px; font-size: 20px; }
 .file-copy { margin: 0; color: var(--muted-text); font-size: 14px; line-height: 1.65; }
 .file-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
-.file-action { cursor: pointer !important; font-weight: 600; transition: transform .15s ease, box-shadow .15s ease; }
-.file-action:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(0, 0, 0, .12); }
+.file-action { font-weight: 600; }
 </style>

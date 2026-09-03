@@ -100,7 +100,6 @@ function requestDelete() {
       title: '删除状态列',
       content: `确定删除状态列「${truncateLabel(lane.name)}」及其 ${lane.todos.length} 条 Todo 吗？此操作无法撤销。`,
       positiveText: '删除',
-      negativeText: '取消',
       showIcon: false,
       onPositiveClick: () => store.deleteLane(lane.id)
     })
@@ -111,7 +110,6 @@ function requestDelete() {
     title: '删除 Todo',
     content: `确定删除「${truncateLabel(todo.text)}」吗？此操作无法撤销。`,
     positiveText: '删除',
-    negativeText: '取消',
     showIcon: false,
     onPositiveClick: () => store.deleteTodo(todo.id)
   })
@@ -156,10 +154,14 @@ function requestDelete() {
 </template>
 
 <style scoped>
-.board-wrap { position: relative; display: flex; align-items: stretch; gap: 8px; flex: 1; height: 100vh; min-height: 0; box-sizing: border-box; overflow: auto; padding: 16px; scrollbar-width: none; }
-.board-wrap::-webkit-scrollbar { display: none; }
-.lane-list { display: flex; align-items: stretch; gap: 8px; min-height: 100%; }
-.lane-panel { flex: 0 0 280px; width: 280px; box-sizing: border-box; min-height: calc(100vh - 32px); padding: 0 3px; display: flex; flex-direction: column; }
+.board-wrap { position: relative; display: flex; align-items: stretch; gap: 8px; flex: 1; min-height: 0; box-sizing: border-box; overflow-x: auto; overflow-y: hidden; padding: 16px 16px 0; scrollbar-color: var(--border) transparent; }
+.board-wrap::-webkit-scrollbar { height: 8px; background: transparent; }
+.board-wrap::-webkit-scrollbar-track { background: transparent; }
+.board-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+.board-wrap::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+.lane-list { display: flex; align-items: stretch; gap: 8px; height: 100%; }
+.lane-panel { flex: 0 0 280px; width: 280px; height: 100%; box-sizing: border-box; padding: 0 3px; display: flex; flex-direction: column; min-height: 0; overflow-y: auto; scrollbar-width: none; }
+.lane-panel::-webkit-scrollbar { display: none; }
 .lane-header, .lane-title-wrap { display: flex; align-items: center; }
 .lane-header { justify-content: space-between; gap: 8px; }
 .lane-title-wrap { min-width: 0; gap: 7px; }
@@ -169,12 +171,12 @@ function requestDelete() {
 .icon-button { display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; color: var(--muted-text); padding: 3px; border-radius: 5px; }
 .lane-grip { cursor: grab !important; }
 .lane-grip:active { cursor: grabbing !important; }
-.todo-list { min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 12px 0 8px; flex-shrink: 0; }
-.todo-list--empty { margin-bottom: 0; padding: 12px 0 0; }
+.todo-list { display: flex; flex-direction: column; gap: 8px; padding: 12px 0 8px; }
+.todo-list--empty { padding: 12px 0 0; }
 .todo-row { display: flex; align-items: flex-start; gap: 8px; min-height: 48px; box-sizing: border-box; padding: 12px; border: 1px solid var(--border); border-radius: 5px; background: var(--todo-bg); color: var(--todo-text); box-shadow: 0 1px 2px rgba(0, 0, 0, .025); font-size: 15px; line-height: 1.45; }
 .todo-text { flex: 1; cursor: default; word-break: break-word; color: var(--todo-text); }
 .lane-ghost, .todo-ghost { opacity: .7; background: transparent; border: 1px dashed var(--border); box-shadow: none; }
-.todo-form { margin: 0 0 20px; flex-shrink: 0; }
+.todo-form { margin: 0; }
 .todo-form :deep(.n-input) { width: 100%; height: 48px; box-sizing: border-box; background: var(--todo-bg); border: 1px solid var(--border); border-radius: 5px; }
 .todo-form :deep(.n-input__border), .todo-form :deep(.n-input__state-border) { display: none; }
 .todo-form :deep(.n-input__content) { height: 100%; padding: 0 12px; }
